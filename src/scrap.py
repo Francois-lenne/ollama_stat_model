@@ -70,4 +70,3 @@ filename = f"ollama_models_{today_str}.parquet"
 
 print(f"Scraping terminé. Enregistrement des données dans {filename}...")
 df.to_parquet(filename, index=False)
- 

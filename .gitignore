@@ -3,3 +3,8 @@ ollama_models_*.parquet
 ollama_models.csv
 *.toml
 .python-version
+*.info
+*.hcl
+*.tfstate
+.terraform
+*.tfvars
