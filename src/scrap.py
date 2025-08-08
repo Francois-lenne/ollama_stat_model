@@ -2,11 +2,12 @@ import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from datetime import date
+import os
 
 
 print("Démarrage du scraping des modèles depuis Ollama...")
 
-def scrap_ollama_models():
+def scrap_ollama_models() -> pd.DataFrame:
     """
     Scrap all the models from the Ollama website and return a DataFrame with their details.
 
@@ -65,8 +66,50 @@ def scrap_ollama_models():
 df = scrap_ollama_models()
 
 
-today_str = date.today().strftime("%Y%m%d")
+def check_data_quality(df):
+    """
+    check the data quality of the dataframe containing the raw data
+    :param df: The dataframe to check
+    """
+
+    # Vérification des doublons sur le nom du modèle
+    if df["name"].duplicated().any():
+        print(df[df["name"].duplicated(keep=False)][["name"]])
+        raise ValueError("Doublons trouvés dans la colonne 'name'.")
+    else:
+        print("Aucun doublon trouvé dans les modèles")
+
+    # Vérification des types de données des colonnes 
+    expected_types = {
+        "name": str,
+        "pulls": str,
+        "sizes": list,
+        "capability": list,
+        "updated": str,
+        "current_data": str
+    }
+
+    for column, expected_type in expected_types.items():
+        if not df[column].apply(lambda x: isinstance(x, expected_type)).all():
+            raise TypeError(f"Type de données incorrect pour la colonne '{column}'. Attendu {expected_type.__name__}, trouvé {df[column].apply(type).unique()}.")   
+    
+    print("Vérification de la qualité des données terminée avec succès.")
+
+
+
+check_data_quality(df)
+
+today_str = date.today().strftime("%Y%m%d") + "_" + pd.Timestamp.now().strftime("%H")
 filename = f"ollama_models_{today_str}.parquet"
 
 print(f"Scraping terminé. Enregistrement des données dans {filename}...")
 df.to_parquet(filename, index=False)
+
+connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+blob_name = os.getenv('AZURE_CONTAINER_NAME')
+
+df.to_parquet(
+    f"abfss://{blob_name}/{filename}",
+    engine="fastparquet",
+    storage_options={"connection_string": connection_string}
+)
