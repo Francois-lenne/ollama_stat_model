@@ -107,6 +107,10 @@ resource "azurerm_linux_function_app" "func" {
     AzureWebJobsStorage                   = azurerm_storage_account.storage.primary_connection_string
     SCM_DO_BUILD_DURING_DEPLOYMENT        = "1"  # build Oryx à partir de requirements.txt
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.ai.connection_string
+
+    # environment variables
+    AZURE_CONTAINER_NAME = var.container_name
+    AZURE_STORAGE_CONNECTION_STRING = azurerm_storage_account.storage.primary_connection_string
   }
 
   identity { type = "SystemAssigned" }

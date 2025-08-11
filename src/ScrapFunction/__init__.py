@@ -1,11 +1,48 @@
+import logging
+import azure.functions as func
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
 from datetime import date
 import os
 
+def main(timer: func.TimerRequest) -> None:
+    """Azure Function entry point - must accept timer parameter"""
+    logging.info('Python timer trigger function started')
+    
+    if timer.past_due:
+        logging.info('The timer is past due!')
+    
+    try:
+        # Call your scraping logic
+        run_scraping()
+    except Exception as e:
+        logging.error(f"Erreur lors de l'exécution: {str(e)}")
+        raise
 
-print("Démarrage du scraping des modèles depuis Ollama...")
+def run_scraping():
+    """Your main scraping logic"""
+    df = scrap_ollama_models()
+    logging.info("Données récupérées avec succès. Début de validation de la donnée")
+    
+    check_data_quality(df)
+    
+    today_str = date.today().strftime("%Y%m%d") + "_" + pd.Timestamp.now().strftime("%H")
+    filename = f"ollama_models_{today_str}.parquet"
+    
+    connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+    blob_name = os.getenv('AZURE_CONTAINER_NAME')
+    
+    df.to_parquet(
+        f"abfss://{blob_name}/{filename}",
+        engine="fastparquet",
+        storage_options={"connection_string": connection_string}
+    )
+    
+    logging.info(f"Les données ont été sauvegardées dans {filename}")
+
+
+
 
 def scrap_ollama_models() -> pd.DataFrame:
     """
@@ -15,7 +52,7 @@ def scrap_ollama_models() -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing model names, pull counts, sizes, capabilities, and update information.
 
     """
-    print("Récupération des données depuis Ollama...")
+    logging.info("Récupération des données depuis Ollama...")
     
     # URL de la page à scraper
     URL = "https://ollama.com/search"
@@ -64,7 +101,7 @@ def scrap_ollama_models() -> pd.DataFrame:
     return pd.DataFrame(model_data)
 
 
-def check_data_quality(df):
+def check_data_quality(df: pd.DataFrame) -> None:
     """
     check the data quality of the dataframe containing the raw data
     :param df: The dataframe to check
@@ -72,10 +109,10 @@ def check_data_quality(df):
 
     # Vérification des doublons sur le nom du modèle
     if df["name"].duplicated().any():
-        print(df[df["name"].duplicated(keep=False)][["name"]])
+        logging.info(df[df["name"].duplicated(keep=False)][["name"]])
         raise ValueError("Doublons trouvés dans la colonne 'name'.")
     else:
-        print("Aucun doublon trouvé dans les modèles")
+        logging.info("Aucun doublon trouvé dans les modèles")
 
     # Vérification des types de données des colonnes 
     expected_types = {
@@ -91,32 +128,11 @@ def check_data_quality(df):
         if not df[column].apply(lambda x: isinstance(x, expected_type)).all():
             raise TypeError(f"Type de données incorrect pour la colonne '{column}'. Attendu {expected_type.__name__}, trouvé {df[column].apply(type).unique()}.")   
     
-    print("Vérification de la qualité des données terminée avec succès.")
+    logging.info("Vérification de la qualité des données terminée avec succès.")
 
+# remove the part of the requirement function to use this block
 
-
-
-
-def main():
-    df = scrap_ollama_models()
-
-    print("données récupérées avec succès. début de validation de la donnée")
-    check_data_quality(df)
-
-    today_str = date.today().strftime("%Y%m%d") + "_" + pd.Timestamp.now().strftime("%H")
-    filename = f"ollama_models_{today_str}.parquet"
-
-    connection_string = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
-    blob_name = os.getenv('AZURE_CONTAINER_NAME')
-
-    df.to_parquet(
-        f"abfss://{blob_name}/{filename}",
-        engine="fastparquet",
-        storage_options={"connection_string": connection_string}
-    )
-
-    print(f"Les données ont été sauvegardées dans {filename} dans le conteneur Azure Blob Storage {blob_name}.")
-
-
+"""
 if __name__ == "__main__":
     main()
+"""
