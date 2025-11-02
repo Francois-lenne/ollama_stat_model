@@ -9,3 +9,4 @@ uv.lock
 .env
 *.xml
 *.backup
+*.csv
